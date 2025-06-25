@@ -8,14 +8,55 @@ import re
 import json
 import math
 from typing import List, Dict, Any, Optional, Union, Callable
-from datasets import load_dataset, Dataset
-from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer
-from trl import GRPOConfig, GRPOTrainer
-from peft import LoraConfig, get_peft_model
 import numpy as np
 from dataclasses import dataclass
 import logging
 import gc
+
+# Handle import errors gracefully
+try:
+    from datasets import load_dataset, Dataset
+
+    DATASETS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Warning: datasets import failed: {e}")
+    print("📝 Please run: pip install datasets --upgrade")
+    DATASETS_AVAILABLE = False
+    # Create dummy classes for type hints
+    Dataset = type("Dataset", (), {})
+    load_dataset = lambda *args, **kwargs: None
+
+try:
+    from transformers import (
+        AutoTokenizer,
+        AutoModelForCausalLM,
+        TrainingArguments,
+        Trainer,
+    )
+
+    TRANSFORMERS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Warning: transformers import failed: {e}")
+    print("📝 Please run: pip install transformers --upgrade")
+    TRANSFORMERS_AVAILABLE = False
+
+try:
+    from trl import GRPOConfig, GRPOTrainer
+
+    TRL_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Warning: trl import failed: {e}")
+    print("📝 Please run: pip install trl --upgrade")
+    TRL_AVAILABLE = False
+
+try:
+    from peft import LoraConfig, get_peft_model
+
+    PEFT_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Warning: peft import failed: {e}")
+    print("📝 Please run: pip install peft --upgrade")
+    PEFT_AVAILABLE = False
 
 # V100 compatibility settings
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Single GPU for Supercloud
@@ -27,6 +68,37 @@ torch.manual_seed(42)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
+
+def check_environment_dependencies():
+    """Check if all required dependencies are available"""
+    missing_deps = []
+
+    if not DATASETS_AVAILABLE:
+        missing_deps.append("datasets")
+    if not TRANSFORMERS_AVAILABLE:
+        missing_deps.append("transformers")
+    if not TRL_AVAILABLE:
+        missing_deps.append("trl")
+    if not PEFT_AVAILABLE:
+        missing_deps.append("peft")
+
+    if missing_deps:
+        print("❌ Missing dependencies:", ", ".join(missing_deps))
+        print("\n🔧 To fix the PyArrow/Protobuf conflict, run ONE of these solutions:")
+        print("\n1. Quick fix (in your current environment):")
+        print("   bash fix_protobuf_conflict.sh")
+        print("\n2. Clean environment (recommended):")
+        print("   bash create_clean_env.sh")
+        print("   conda activate rl_clean")
+        print("\n3. Manual fix:")
+        print("   pip uninstall -y pyarrow datasets protobuf")
+        print("   pip install protobuf==3.20.3 pyarrow==12.0.1 datasets==2.14.0")
+        return False
+
+    print("✅ All dependencies available!")
+    return True
+
 
 # =============================================================================
 # 1. DATA PREPARATION AND FORMATTING
@@ -924,6 +996,12 @@ python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA av
 
 
 if __name__ == "__main__":
+    # Check dependencies first
+    if not check_environment_dependencies():
+        print("\n❌ Cannot proceed with missing dependencies.")
+        print("Please fix the environment and try again.")
+        exit(1)
+
     # Create helper scripts
     create_supercloud_job_script()
     setup_supercloud_environment()
